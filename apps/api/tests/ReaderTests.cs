@@ -156,7 +156,7 @@ public sealed class ReaderDatabase : IAsyncLifetime
         connectionString = Environment.GetEnvironmentVariable("RYOURI_TEST_CONNECTION")
             ?? throw new InvalidOperationException("Set RYOURI_TEST_CONNECTION to a disposable PostgreSQL database (CREATE SCHEMA required).");
         var migrationPath = Environment.GetEnvironmentVariable("RYOURI_TEST_SCHEMA")
-            ?? Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../../database/migrations/001_create_recipes.sql"));
+            ?? Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../database/migrations/001_create_recipes.sql"));
         var migration = await File.ReadAllTextAsync(migrationPath);
         await using var connection = new NpgsqlConnection(connectionString);
         await connection.OpenAsync();
