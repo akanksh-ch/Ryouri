@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { afterEach, expect, test, vi } from "vite-plus/test";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { App } from "./App";

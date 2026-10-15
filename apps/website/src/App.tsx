@@ -1,4 +1,9 @@
 import * as React from "react";
+import { Alert, AlertDescription, AlertTitle } from "./components/ui/alert";
+import { Button } from "./components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
+import { Label } from "./components/ui/label";
+import { NativeSelect, NativeSelectOption } from "./components/ui/native-select";
 
 type Summary = {
   id: string;
@@ -32,16 +37,19 @@ function RecipeImage({
 }) {
   const [failed, setFailed] = React.useState<string | null>(null);
   return (
-    <div className={`recipe-image${hero ? " hero-image" : ""}`}>
+    <div
+      className={`grid place-items-center overflow-hidden bg-muted ${hero ? "mb-7 aspect-[16/10] max-h-[420px] rounded-xl sm:aspect-[16/7]" : "aspect-[16/10]"}`}
+    >
       {src && src !== failed ? (
         <img
+          className="h-full min-h-0 w-full object-cover"
           src={src}
           alt={hero ? title : ""}
           loading={hero ? "eager" : "lazy"}
           onError={() => setFailed(src)}
         />
       ) : (
-        <span className="image-placeholder">No image</span>
+        <span className="text-sm text-muted-foreground">No image</span>
       )}
     </div>
   );
@@ -49,20 +57,30 @@ function RecipeImage({
 
 function Failure({ retry }: { retry: () => void }) {
   return (
-    <div className="notice" role="alert">
-      <h2>Recipes could not be loaded</h2>
-      <p>Check your connection and that the recipe service is running, then try again.</p>
-      <button onClick={retry}>Try again</button>
-    </div>
+    <Alert variant="destructive" className="my-8 max-w-prose p-5">
+      <AlertTitle>
+        <h2 className="text-base font-semibold">Recipes could not be loaded</h2>
+      </AlertTitle>
+      <AlertDescription>
+        <p>Check your connection and that the recipe service is running, then try again.</p>
+        <Button className="mt-3 min-h-11" onClick={retry}>
+          Try again
+        </Button>
+      </AlertDescription>
+    </Alert>
   );
 }
 
 function NotFound() {
   return (
-    <div className="notice">
-      <h1>Recipe not found</h1>
-      <p>This recipe may not exist. Choose a recipe from the collection.</p>
-      <a href="/">Back to recipes</a>
+    <div className="max-w-prose space-y-4 py-12">
+      <h1 className="text-3xl font-semibold tracking-tight">Recipe not found</h1>
+      <p className="text-muted-foreground">
+        This recipe may not exist. Choose a recipe from the collection.
+      </p>
+      <Button asChild variant="outline" className="min-h-11">
+        <a href="/">Back to recipes</a>
+      </Button>
     </div>
   );
 }
@@ -71,14 +89,13 @@ function Collection() {
   const [sort, setSort] = React.useState("asc");
   const [cuisine, setCuisine] = React.useState("");
   const [attempt, setAttempt] = React.useState(0);
-  const [result, setResult] = React.useState<{ recipes: Summary[]; cuisines: string[] } | null>(
-    null,
-  );
+  const [recipes, setRecipes] = React.useState<Summary[] | null>(null);
+  const [cuisines, setCuisines] = React.useState<string[]>([]);
   const [failed, setFailed] = React.useState(false);
 
   React.useEffect(() => {
     const controller = new AbortController();
-    setResult(null);
+    setRecipes(null);
     setFailed(false);
     const query = new URLSearchParams({ sort });
     if (cuisine) query.set("cuisine", cuisine);
@@ -89,7 +106,10 @@ function Collection() {
       .then(([recipes, cuisines]) => {
         if (!Array.isArray(recipes) || !Array.isArray(cuisines))
           throw new Error("Invalid collection response");
-        if (!controller.signal.aborted) setResult({ recipes, cuisines });
+        if (!controller.signal.aborted) {
+          setRecipes(recipes);
+          setCuisines(cuisines);
+        }
       })
       .catch(() => {
         if (!controller.signal.aborted) setFailed(true);
@@ -97,68 +117,89 @@ function Collection() {
     return () => controller.abort();
   }, [sort, cuisine, attempt]);
 
-  // Keep the available controls stable while the filtered results load.
-  const [cuisines, setCuisines] = React.useState<string[]>([]);
-  React.useEffect(() => {
-    if (result) setCuisines(result.cuisines);
-  }, [result]);
-
   return (
     <>
-      <div className="collection-heading">
-        <h1>Your recipe book</h1>
-        <p>Something good to cook.</p>
-      </div>
-      <div className="filters">
-        <label>
-          Cuisine
-          <select value={cuisine} onChange={(event) => setCuisine(event.target.value)}>
-            <option value="">All cuisines</option>
+      <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Your recipe book</h1>
+      <p className="mt-3 text-muted-foreground">Something good to cook.</p>
+      <div className="mt-8 flex flex-wrap gap-5 border-b pb-6">
+        <div className="grid w-full gap-2 sm:w-60">
+          <Label htmlFor="cuisine">Cuisine</Label>
+          <NativeSelect
+            id="cuisine"
+            className="w-full [&_select]:h-11"
+            value={cuisine}
+            onChange={(event) => setCuisine(event.target.value)}
+          >
+            <NativeSelectOption value="">All cuisines</NativeSelectOption>
             {cuisines.map((name) => (
-              <option key={name} value={name}>
+              <NativeSelectOption key={name} value={name}>
                 {name}
-              </option>
+              </NativeSelectOption>
             ))}
-          </select>
-        </label>
-        <label>
-          Cooking time
-          <select value={sort} onChange={(event) => setSort(event.target.value)}>
-            <option value="asc">Shortest first</option>
-            <option value="desc">Longest first</option>
-          </select>
-        </label>
+          </NativeSelect>
+        </div>
+        <div className="grid w-full gap-2 sm:w-60">
+          <Label htmlFor="sort">Cooking time</Label>
+          <NativeSelect
+            id="sort"
+            className="w-full [&_select]:h-11"
+            value={sort}
+            onChange={(event) => setSort(event.target.value)}
+          >
+            <NativeSelectOption value="asc">Shortest first</NativeSelectOption>
+            <NativeSelectOption value="desc">Longest first</NativeSelectOption>
+          </NativeSelect>
+        </div>
       </div>
       {failed ? (
         <Failure retry={() => setAttempt(attempt + 1)} />
-      ) : !result ? (
-        <p className="notice" role="status">
+      ) : !recipes ? (
+        <p className="py-12 text-muted-foreground" role="status">
           Loading recipes…
         </p>
-      ) : result.recipes.length === 0 ? (
-        <div className="notice" role="status">
-          <h2>{cuisine ? "No recipes match this cuisine" : "No recipes yet"}</h2>
+      ) : recipes.length === 0 ? (
+        <div className="space-y-4 py-12" role="status">
+          <h2 className="text-xl font-semibold">
+            {cuisine ? "No recipes match this cuisine" : "No recipes yet"}
+          </h2>
           {cuisine ? (
-            <button onClick={() => setCuisine("")}>Show all cuisines</button>
+            <Button className="min-h-11" onClick={() => setCuisine("")}>
+              Show all cuisines
+            </Button>
           ) : (
-            <p>Your collection will appear here when recipes are added.</p>
+            <p className="text-muted-foreground">
+              Your collection will appear here when recipes are added.
+            </p>
           )}
         </div>
       ) : (
         <>
-          <p className="result-count" role="status">
-            {result.recipes.length} {result.recipes.length === 1 ? "recipe" : "recipes"}
+          <p className="my-5 text-sm text-muted-foreground" role="status">
+            {recipes.length} {recipes.length === 1 ? "recipe" : "recipes"}
           </p>
-          <div className="recipe-grid">
-            {result.recipes.map((recipe) => (
-              <article className="recipe-card" key={recipe.id}>
-                <a href={`/recipes/${encodeURIComponent(recipe.id)}`}>
-                  <RecipeImage src={recipe.imageUrl} title={recipe.title} />
-                  <h2>{recipe.title}</h2>
-                </a>
-                <p>{recipe.cuisine}</p>
-                <p className="cooking-time">{recipe.cookMinutes} min cooking</p>
-              </article>
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {recipes.map((recipe) => (
+              <Card className="gap-0 pt-0" key={recipe.id}>
+                <article className="min-w-0">
+                  <a
+                    className="group block rounded-t-xl"
+                    href={`/recipes/${encodeURIComponent(recipe.id)}`}
+                  >
+                    <RecipeImage src={recipe.imageUrl} title={recipe.title} />
+                    <CardHeader className="py-4">
+                      <CardTitle>
+                        <h2 className="text-lg font-semibold group-hover:underline group-hover:underline-offset-4">
+                          {recipe.title}
+                        </h2>
+                      </CardTitle>
+                    </CardHeader>
+                  </a>
+                  <CardContent className="space-y-1 text-muted-foreground">
+                    <p>{recipe.cuisine}</p>
+                    <p className="text-sm">{recipe.cookMinutes} min cooking</p>
+                  </CardContent>
+                </article>
+              </Card>
             ))}
           </div>
         </>
@@ -193,57 +234,71 @@ function Detail({ id }: { id: string }) {
 
   if (status === "loading")
     return (
-      <p className="notice" role="status">
+      <p className="py-12 text-muted-foreground" role="status">
         Loading recipe…
       </p>
     );
   if (status === "missing") return <NotFound />;
   if (status === "error" || !recipe) return <Failure retry={() => setAttempt(attempt + 1)} />;
   return (
-    <article className="recipe-detail">
-      <a className="back-link" href="/">
-        Back to recipes
-      </a>
+    <article className="mx-auto max-w-4xl">
+      <Button asChild variant="outline" className="mb-6 min-h-11">
+        <a href="/">Back to recipes</a>
+      </Button>
       <RecipeImage src={recipe.imageUrl} title={recipe.title} hero />
-      <h1>{recipe.title}</h1>
-      {recipe.description && <p className="description">{recipe.description}</p>}
-      <dl className="metadata">
+      <h1 className="text-3xl leading-tight font-semibold tracking-tight sm:text-4xl">
+        {recipe.title}
+      </h1>
+      {recipe.description && (
+        <p className="mt-4 max-w-prose whitespace-pre-wrap text-muted-foreground">
+          {recipe.description}
+        </p>
+      )}
+      <dl className="my-8 grid grid-cols-2 gap-5 border-y py-6 sm:grid-cols-4">
         <div>
-          <dt>Preparation</dt>
-          <dd>{recipe.prepMinutes} min</dd>
+          <dt className="text-sm text-muted-foreground">Preparation</dt>
+          <dd className="mt-1 font-medium">{recipe.prepMinutes} min</dd>
         </div>
         <div>
-          <dt>Cooking</dt>
-          <dd>{recipe.cookMinutes} min</dd>
+          <dt className="text-sm text-muted-foreground">Cooking</dt>
+          <dd className="mt-1 font-medium">{recipe.cookMinutes} min</dd>
         </div>
         <div>
-          <dt>Servings</dt>
-          <dd>{recipe.servings}</dd>
+          <dt className="text-sm text-muted-foreground">Servings</dt>
+          <dd className="mt-1 font-medium">{recipe.servings}</dd>
         </div>
         <div>
-          <dt>Cuisine</dt>
-          <dd>{recipe.cuisine}</dd>
+          <dt className="text-sm text-muted-foreground">Cuisine</dt>
+          <dd className="mt-1 font-medium">{recipe.cuisine}</dd>
         </div>
       </dl>
-      <div className="recipe-body">
-        <section aria-labelledby="ingredients">
-          <h2 id="ingredients">Ingredients</h2>
+      <div className="grid gap-8 md:grid-cols-[1fr_1.65fr] md:gap-12">
+        <section className="min-w-0" aria-labelledby="ingredients">
+          <h2 className="mb-5 text-2xl font-semibold" id="ingredients">
+            Ingredients
+          </h2>
           {recipe.ingredients.map((group, index) => (
-            <div className="ingredient-group" key={index}>
-              {group.heading && <h3>{group.heading}</h3>}
-              <ul>
+            <div className="mb-6" key={index}>
+              {group.heading && <h3 className="mb-3 text-lg font-medium">{group.heading}</h3>}
+              <ul className="list-disc space-y-3 pl-5 leading-relaxed">
                 {group.items.map((item, itemIndex) => (
-                  <li key={itemIndex}>{item}</li>
+                  <li className="pl-1 whitespace-pre-wrap" key={itemIndex}>
+                    {item}
+                  </li>
                 ))}
               </ul>
             </div>
           ))}
         </section>
-        <section aria-labelledby="instructions">
-          <h2 id="instructions">Instructions</h2>
-          <ol className="steps">
+        <section className="min-w-0" aria-labelledby="instructions">
+          <h2 className="mb-5 text-2xl font-semibold" id="instructions">
+            Instructions
+          </h2>
+          <ol className="list-decimal space-y-6 pl-6 leading-relaxed marker:font-semibold">
             {recipe.steps.map((step, index) => (
-              <li key={index}>{step}</li>
+              <li className="pl-2 whitespace-pre-wrap" key={index}>
+                {step}
+              </li>
             ))}
           </ol>
         </section>
@@ -257,16 +312,23 @@ export function App() {
   const detail = /^\/recipes\/([a-z0-9]+(?:-[a-z0-9]+)*)\/?$/.exec(path);
   return (
     <>
-      <a className="skip-link" href="#main">
+      <a
+        className="absolute -top-24 left-4 z-10 rounded-md bg-background p-3 underline focus:top-4"
+        href="#main"
+      >
         Skip to content
       </a>
-      <header className="site-header">
-        <a href="/" className="brand">
+      <header className="mx-auto flex max-w-7xl items-baseline justify-between gap-4 border-b px-4 py-5 sm:px-8">
+        <a href="/" className="text-2xl font-semibold tracking-tight">
           Ryouri
         </a>
-        <span>A personal recipe book</span>
+        <span className="text-sm text-muted-foreground">A personal recipe book</span>
       </header>
-      <main id="main" tabIndex={-1}>
+      <main
+        className="mx-auto max-w-7xl px-4 py-8 wrap-anywhere sm:px-8 sm:py-10"
+        id="main"
+        tabIndex={-1}
+      >
         {path === "/" ? <Collection /> : detail ? <Detail id={detail[1]} /> : <NotFound />}
       </main>
     </>
