@@ -49,6 +49,34 @@ test("collection uses summaries and links image/title to stable recipe URLs", as
   expect(screen.getByText("No image")).toBeTruthy();
 });
 
+test("cuisine display uses title case while filter values retain stored casing", async () => {
+  const fetch = api([{ ...rice, cuisine: "japanese" }], ["japanese"]);
+  open();
+  await screen.findByRole("link", { name: /Tomato Rice/ });
+  expect(screen.getByText("Japanese", { selector: "p" })).toBeTruthy();
+  const sidebar = screen.getByRole("complementary", { name: "Quick filters" });
+  fireEvent.click(within(sidebar).getByRole("button", { name: "Japanese" }));
+  await waitFor(() =>
+    expect(fetch.mock.calls.some(([url]) => url === "/api/recipes?sort=asc&cuisine=japanese")).toBe(
+      true,
+    ),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+  const option = screen.getByRole("option", { name: "Japanese" }) as HTMLOptionElement;
+  expect(option.value).toBe("japanese");
+  expect((screen.getByLabelText("Cuisine") as HTMLSelectElement).value).toBe("japanese");
+});
+
+test.each([
+  ["japanese", "Japanese"],
+  ["middle eastern", "Middle Eastern"],
+])("detail displays stored cuisine %s as %s", async (stored, label) => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ ...detail, cuisine: stored }));
+  open("/recipes/tomato-rice");
+  await screen.findByRole("heading", { name: "Tomato Rice" });
+  expect(within(screen.getByText("Cuisine").parentElement!).getByText(label)).toBeTruthy();
+});
+
 test("sort/filter compose in HTTP requests and neither selection resets the other", async () => {
   const fetch = api();
   open();

@@ -23,6 +23,10 @@ type Recipe = Summary & {
   steps: string[];
 };
 
+function cuisineLabel(value: string) {
+  return value.replace(/\S+/g, (word) => word[0].toUpperCase() + word.slice(1).toLowerCase());
+}
+
 async function read<T>(url: string, signal: AbortSignal): Promise<T> {
   const response = await fetch(url, { signal, headers: { Accept: "application/json" } });
   if (!response.ok) throw new Error(String(response.status));
@@ -171,7 +175,7 @@ function Collection() {
               aria-pressed={cuisine === name}
               onClick={() => setCuisine(name)}
             >
-              {name}
+              {cuisineLabel(name)}
             </Button>
           ))}
         </fieldset>
@@ -219,7 +223,7 @@ function Collection() {
                   <NativeSelectOption value="">All cuisines</NativeSelectOption>
                   {cuisines.map((name) => (
                     <NativeSelectOption key={name} value={name}>
-                      {name}
+                      {cuisineLabel(name)}
                     </NativeSelectOption>
                   ))}
                 </NativeSelect>
@@ -296,7 +300,7 @@ function Collection() {
                       </CardHeader>
                     </a>
                     <CardContent className="space-y-1 text-muted-foreground">
-                      <p>{recipe.cuisine}</p>
+                      <p>{cuisineLabel(recipe.cuisine)}</p>
                       <p className="text-sm">{recipe.cookMinutes} min cooking</p>
                     </CardContent>
                   </article>
@@ -371,7 +375,7 @@ function Detail({ id }: { id: string }) {
         </div>
         <div>
           <dt className="text-sm text-muted-foreground">Cuisine</dt>
-          <dd className="mt-1 font-medium">{recipe.cuisine}</dd>
+          <dd className="mt-1 font-medium">{cuisineLabel(recipe.cuisine)}</dd>
         </div>
       </dl>
       <div className="grid gap-8 md:grid-cols-[1fr_1.65fr] md:gap-12">
