@@ -118,6 +118,48 @@ back; if its reserved ID already exists, it fails without changing that recipe.
 For an independently managed test PostgreSQL, use
 `psql "$DATABASE_URL" -f check.sql` after applying the schema through migration 003.
 
+## Optional persisted preview recipes
+
+`seed.sql` is opt-in, outside migrations, and never runs automatically. It adds
+seven `sample-*` recipes with `ON CONFLICT (id) DO NOTHING`: existing recipes,
+including conflicting sample IDs, remain untouched. There is no cleanup script.
+Against the running local database, explicitly run:
+
+```sh
+podman compose exec -T postgres psql -U ryouri -d ryouri < seed.sql
+podman compose exec -T postgres psql -U ryouri -d ryouri < check-samples.sql
+```
+
+Examples cover Indian/Japanese/Arabic cuisines, case/whitespace variants for
+read-side normalization (normal imports trim labels), cook times 0/5/10/20/30,
+equal-time title/ID ties, preparation-only salad and cooking-only tofu. Optional
+descriptions, different servings, plain groups, Dough/Stuffing headings, mixed
+headed/unheaded groups, ordered items and steps are included. Images are NULL
+placeholders, not fabricated references. The read-only sample check covers both
+sort directions, normalized cuisine choices and representative detail fields.
+It may fail if an existing conflicting sample ID differs; never overwrite that
+recipe just to satisfy the examples.
+
+### Running local connection (no secrets in logs)
+
+The real rootless PostgreSQL instance is running as `database_postgres_1`:
+
+- Host `127.0.0.1`, port `55432`, database `ryouri`, username `ryouri`.
+- Password: read `POSTGRES_PASSWORD` locally from this worktree's ignored,
+  mode-0600 `apps/database/.env`. Do not print, commit or send the value.
+- Backend connection template:
+  `Host=127.0.0.1;Port=55432;Database=ryouri;Username=ryouri;Password=<local value>`.
+  Configure it only in the API's local environment/secret configuration.
+- Host files persist in `${HOME}/.local/state/ryouri/postgres`, mounted at
+  container `/var/lib/postgresql/data` with SELinux `:Z`. The earlier `database`
+  directory and all pre-existing data were left untouched.
+
+The dedicated `postgres` directory was absent before startup. Initialization
+applied all three migrations; constraints passed. The explicit seed inserted
+seven rows; rerunning inserted zero rows. Persisted sample reads passed. The DB
+is available for live preview, but API connectivity/availability must still be
+verified by the backend lane. No image files were added.
+
 ## Database backup and restore
 
 Pause imports for the entire database **and image** backup window. For the
