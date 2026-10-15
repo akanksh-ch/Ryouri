@@ -31,11 +31,19 @@ BEGIN
     END IF;
 
     SELECT array_agg(cuisine ORDER BY cuisine) INTO cuisines FROM (
-        SELECT DISTINCT lower(btrim(cuisine)) AS cuisine
-        FROM recipes WHERE id = ANY(ordered_ids)
-    ) AS normalized;
+        SELECT DISTINCT cuisine FROM recipes WHERE id = ANY(ordered_ids)
+    ) AS stored;
     IF cuisines IS DISTINCT FROM ARRAY['arabic', 'indian', 'japanese'] THEN
-        RAISE EXCEPTION 'Sample cuisine normalization differs: %', cuisines;
+        RAISE EXCEPTION 'Stored sample cuisines must be trimmed lowercase: %', cuisines;
+    END IF;
+
+    -- Isolated adversarial labels: no visible recipes are inserted or modified.
+    SELECT array_agg(cuisine ORDER BY cuisine) INTO cuisines FROM (
+        SELECT DISTINCT lower(btrim(label)) AS cuisine
+        FROM (VALUES ('Japanese'), ('JAPANESE'), (' japanese ')) AS cases(label)
+    ) AS normalized;
+    IF cuisines IS DISTINCT FROM ARRAY['japanese'] THEN
+        RAISE EXCEPTION 'Case/whitespace deduplication failed: %', cuisines;
     END IF;
 
     IF NOT EXISTS (SELECT 1 FROM recipes WHERE id = 'sample-fattoush'
