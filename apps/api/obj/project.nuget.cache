@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "bQYk4h9/lsc=",
+  "success": true,
+  "projectFilePath": "/home/akanksh/Projects/Ryouri/apps/api/Api.csproj",
+  "expectedPackageFiles": [
+    "/home/akanksh/.nuget/packages/microsoft.aspnetcore.openapi/10.0.12/microsoft.aspnetcore.openapi.10.0.12.nupkg.sha512",
+    "/home/akanksh/.nuget/packages/microsoft.openapi/2.12.0/microsoft.openapi.2.12.0.nupkg.sha512"
+  ],
+  "logs": []
+}
