@@ -14,8 +14,8 @@ write/import validation endpoint in this reader-only milestone.
 
 ## Run
 
-1. Provision PostgreSQL and apply the database lane's versioned migration:
-   `apps/database/migrations/001_create_recipes.sql`.
+1. Provision PostgreSQL and apply all database lane migrations in filename order
+   from `apps/database/migrations/`, including the corrected time constraints.
 2. Set `ConnectionStrings__Recipes` to a PostgreSQL connection string supplied
    through local/deployment configuration, not a committed settings file.
 3. From the repository root:
@@ -57,19 +57,20 @@ From the repository root:
 dotnet build apps/api/Api.csproj --configuration Release --warnaserror
 export RYOURI_TEST_CONNECTION='<connection string for a disposable PostgreSQL database>'
 # Optional: use the migration from a database worktree before its PR is integrated.
-# export RYOURI_TEST_SCHEMA='/absolute/path/to/001_create_recipes.sql'
+# export RYOURI_TEST_MIGRATIONS='/absolute/path/to/apps/database/migrations'
 dotnet test apps/api/tests/Api.Tests.csproj --configuration Release -warnaserror
 dotnet format apps/api/Api.csproj --verify-no-changes
 dotnet format apps/api/tests/Api.Tests.csproj --verify-no-changes
 ```
 
 The test database user needs permission to create/drop schemas and tables. Tests
-create uniquely named populated and empty schemas, apply the actual database
-migration in each, seed recipes, exercise the real HTTP endpoints and SQL, and
+create uniquely named populated and empty schemas, apply all actual database
+migrations in filename order in each, seed recipes, exercise the real HTTP endpoints and SQL, and
 drop those schemas on teardown. They never truncate an existing `recipes` table.
 Missing database configuration or migration files fail tests rather than silently
-skipping integration proof. The migration defaults to
-`apps/database/migrations/001_create_recipes.sql` in this checkout.
+skipping integration proof. The migration directory defaults to
+`apps/database/migrations/` in this checkout. An empty migration directory also
+fails rather than bypassing schema verification.
 
 Coverage includes default/ascending/descending cooking-time ordering with title/ID
 ties, simultaneous normalized cuisine filtering, SQL-like input as literal data,

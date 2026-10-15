@@ -200,9 +200,10 @@ public sealed class ReaderDatabase : IAsyncLifetime
     {
         connectionString = Environment.GetEnvironmentVariable("RYOURI_TEST_CONNECTION")
             ?? throw new InvalidOperationException("Set RYOURI_TEST_CONNECTION to a disposable PostgreSQL database (CREATE SCHEMA required).");
-        var migrationPath = Environment.GetEnvironmentVariable("RYOURI_TEST_SCHEMA")
-            ?? Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../database/migrations/001_create_recipes.sql"));
-        var migration = await File.ReadAllTextAsync(migrationPath);
+        var migrationDirectory = Environment.GetEnvironmentVariable("RYOURI_TEST_MIGRATIONS")
+            ?? Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../database/migrations"));
+        var migrationPaths = Directory.GetFiles(migrationDirectory, "*.sql").Order(StringComparer.Ordinal).ToArray();
+        if (migrationPaths.Length == 0) throw new InvalidOperationException("No database migrations found.");
         await using var connection = new NpgsqlConnection(connectionString);
         await connection.OpenAsync();
         await using (var command = new NpgsqlCommand($"CREATE SCHEMA {schema}; CREATE SCHEMA {schema}_empty", connection))
@@ -215,8 +216,11 @@ public sealed class ReaderDatabase : IAsyncLifetime
         {
             await using var schemaConnection = new NpgsqlConnection(target);
             await schemaConnection.OpenAsync();
-            await using var command = new NpgsqlCommand(migration, schemaConnection);
-            await command.ExecuteNonQueryAsync();
+            foreach (var migrationPath in migrationPaths)
+            {
+                await using var command = new NpgsqlCommand(await File.ReadAllTextAsync(migrationPath), schemaConnection);
+                await command.ExecuteNonQueryAsync();
+            }
         }
         await using var seedConnection = new NpgsqlConnection(populated);
         await seedConnection.OpenAsync();
