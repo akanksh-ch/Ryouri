@@ -103,6 +103,39 @@ public sealed class ReaderTests : IClassFixture<ReaderDatabase>
         Assert.NotEmpty(problem.GetProperty("errors").GetProperty("sort").EnumerateArray());
     }
 
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(1, 0)]
+    [InlineData(-1, 1)]
+    [InlineData(1, -1)]
+    public async Task Persistence_rejects_nonpositive_preparation_or_cooking_time(int prepMinutes, int cookMinutes)
+    {
+        await using var connection = new NpgsqlConnection(database.ConnectionString);
+        await connection.OpenAsync();
+        await using var transaction = await connection.BeginTransactionAsync();
+        await using var command = new NpgsqlCommand("""
+            INSERT INTO recipes (id, title, cuisine, prep_minutes, cook_minutes, servings, ingredients, steps)
+            VALUES ('invalid-times', 'Invalid times', 'Indian', $1, $2, 1, '[{"items":["Rice"]}]', ARRAY['Cook'])
+            """, connection, transaction);
+        command.Parameters.AddWithValue(prepMinutes);
+        command.Parameters.AddWithValue(cookMinutes);
+        var error = await Assert.ThrowsAsync<PostgresException>(() => command.ExecuteNonQueryAsync());
+        Assert.Equal(PostgresErrorCodes.CheckViolation, error.SqlState);
+    }
+
+    [Fact]
+    public async Task Persistence_accepts_one_minute_preparation_and_cooking_time()
+    {
+        await using var connection = new NpgsqlConnection(database.ConnectionString);
+        await connection.OpenAsync();
+        await using var transaction = await connection.BeginTransactionAsync();
+        await using var command = new NpgsqlCommand("""
+            INSERT INTO recipes (id, title, cuisine, prep_minutes, cook_minutes, servings, ingredients, steps)
+            VALUES ('positive-times', 'Positive times', 'Indian', 1, 1, 1, '[{"items":["Rice"]}]', ARRAY['Cook'])
+            """, connection, transaction);
+        Assert.Equal(1, await command.ExecuteNonQueryAsync());
+    }
+
     [Fact]
     public async Task Empty_database_is_a_successful_empty_collection()
     {
@@ -148,6 +181,7 @@ public sealed class ReaderDatabase : IAsyncLifetime
     private readonly string schema = "reader_" + Guid.NewGuid().ToString("N");
     private string connectionString = null!;
     public ReaderFactory Factory { get; private set; } = null!;
+    public string ConnectionString { get; private set; } = null!;
     public string EmptyConnectionString { get; private set; } = null!;
     public string MissingSchemaConnectionString { get; private set; } = null!;
 
@@ -163,6 +197,7 @@ public sealed class ReaderDatabase : IAsyncLifetime
         await using (var command = new NpgsqlCommand($"CREATE SCHEMA {schema}; CREATE SCHEMA {schema}_empty", connection))
             await command.ExecuteNonQueryAsync();
         var populated = new NpgsqlConnectionStringBuilder(connectionString) { SearchPath = schema }.ConnectionString;
+        ConnectionString = populated;
         EmptyConnectionString = new NpgsqlConnectionStringBuilder(connectionString) { SearchPath = schema + "_empty" }.ConnectionString;
         MissingSchemaConnectionString = new NpgsqlConnectionStringBuilder(connectionString) { SearchPath = schema + "_missing" }.ConnectionString;
         foreach (var target in new[] { populated, EmptyConnectionString })
@@ -177,9 +212,9 @@ public sealed class ReaderDatabase : IAsyncLifetime
         await using var seed = new NpgsqlCommand("""
             INSERT INTO recipes (id, title, description, cuisine, prep_minutes, cook_minutes, servings, ingredients, steps, image_path)
             VALUES
-              ('slow', 'Slow', NULL, 'Italian', 0, 30, 1, '[{"items":["Rice"]}]', ARRAY['Cook'], NULL),
-              ('z-last', 'Zulu', NULL, 'italian', 0, 20, 1, '[{"items":["Rice"]}]', ARRAY['Cook'], NULL),
-              ('same-b', 'Alpha', NULL, E'\t indian \n', 0, 20, 1, '[{"items":["Rice"]}]', ARRAY['Cook'], NULL),
+              ('slow', 'Slow', NULL, 'Italian', 1, 30, 1, '[{"items":["Rice"]}]', ARRAY['Cook'], NULL),
+              ('z-last', 'Zulu', NULL, 'italian', 1, 20, 1, '[{"items":["Rice"]}]', ARRAY['Cook'], NULL),
+              ('same-b', 'Alpha', NULL, E'\t indian \n', 1, 20, 1, '[{"items":["Rice"]}]', ARRAY['Cook'], NULL),
               ('same-a', 'Alpha', 'A description', 'Indian', 90, 20, 2,
                 '[{"heading":"Dough","items":["Flour","Water"]},{"items":["Salt"]},{"heading":"Stuffing","items":["Cheese"]}]',
                 ARRAY['Mix','Fill','Cook'], 'example.webp'),

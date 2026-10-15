@@ -4,6 +4,12 @@
 provides reads only; it does not create the database schema, import recipes,
 write data, or serve image files.
 
+The user's updated requirement supersedes SRS v1.1: both `prepMinutes` and
+`cookMinutes` must be integers strictly greater than zero. Zero is invalid.
+The database schema must enforce this rule. The later import slice must also
+reject zero/negative values with field-keyed validation errors; there is no
+write/import validation endpoint in this reader-only milestone.
+
 ## Run
 
 1. Provision PostgreSQL and apply the database lane's versioned migration:
@@ -67,5 +73,7 @@ Coverage includes default/ascending/descending cooking-time ordering with title/
 ties, simultaneous normalized cuisine filtering, SQL-like input as literal data,
 global cuisine deduplication, ordered grouped/plain detail ingredients, nullable
 images, missing IDs, rejected sort values, an empty collection, sanitized database
-errors, and removal of the weather endpoint. Import, replacement, image/security,
+errors, removal of the weather endpoint, database rejection of zero/negative
+preparation and cooking times, and acceptance of the one-minute boundary.
+Import, replacement, image/security,
 and deployment acceptance remain later milestones.
