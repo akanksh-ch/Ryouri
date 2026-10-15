@@ -31,11 +31,20 @@ BEGIN
     EXCEPTION WHEN unique_violation THEN NULL;
     END;
 
+    -- Valid zero-time cases and signed-int maxima must not cause overflow.
+    UPDATE recipes SET prep_minutes = 1, cook_minutes = 0
+    WHERE id = 'database-constraint-check'; -- Salad: preparation only.
+    UPDATE recipes SET prep_minutes = 0, cook_minutes = 1
+    WHERE id = 'database-constraint-check';
+    UPDATE recipes SET prep_minutes = 2147483647, cook_minutes = 2147483647
+    WHERE id = 'database-constraint-check';
+    UPDATE recipes SET prep_minutes = 1, cook_minutes = 1
+    WHERE id = 'database-constraint-check';
+
     FOREACH change IN ARRAY ARRAY[
         'prep_minutes = -1',
-        'prep_minutes = 0',
         'cook_minutes = -1',
-        'cook_minutes = 0',
+        'prep_minutes = 0, cook_minutes = 0',
         'servings = 0',
         'servings = -1',
         'ingredients = ''[]''::jsonb',
