@@ -54,20 +54,70 @@ test("sort/filter compose in HTTP requests and neither selection resets the othe
   open();
   await screen.findByRole("link", { name: /Tomato Rice/ });
   expect(fetch.mock.calls.some(([url]) => url === "/api/recipes?sort=asc")).toBe(true);
-  fireEvent.change(screen.getByLabelText("Cooking time"), { target: { value: "desc" } });
-  fireEvent.change(screen.getByLabelText("Cuisine"), { target: { value: "Indian" } });
+  fireEvent.change(screen.getByLabelText("Sort by"), { target: { value: "desc" } });
+  fireEvent.click(
+    within(screen.getByRole("complementary", { name: "Quick filters" })).getByRole("button", {
+      name: "Indian",
+    }),
+  );
   await waitFor(() =>
     expect(fetch.mock.calls.some(([url]) => url === "/api/recipes?sort=desc&cuisine=Indian")).toBe(
       true,
     ),
   );
-  expect((screen.getByLabelText("Cooking time") as HTMLSelectElement).value).toBe("desc");
-  fireEvent.change(screen.getByLabelText("Cooking time"), { target: { value: "asc" } });
+  expect((screen.getByLabelText("Sort by") as HTMLSelectElement).value).toBe("desc");
+  fireEvent.change(screen.getByLabelText("Sort by"), { target: { value: "asc" } });
   await waitFor(() =>
     expect(fetch.mock.calls.some(([url]) => url === "/api/recipes?sort=asc&cuisine=Indian")).toBe(
       true,
     ),
   );
+});
+
+test("local title search ignores case and surrounding spaces without new requests", async () => {
+  const fetch = api([
+    { ...rice, id: "salad", title: "Garden Salad", cookMinutes: 0 },
+    { ...rice, id: "quick-rice", title: "Quick Rice", cookMinutes: 10 },
+    rice,
+  ]);
+  open();
+  await screen.findByRole("link", { name: /Tomato Rice/ });
+  const calls = fetch.mock.calls.length;
+  fireEvent.change(screen.getByLabelText("Search recipes by title"), {
+    target: { value: " SALAD " },
+  });
+  expect(screen.queryByRole("link", { name: /Quick Rice/ })).toBeNull();
+  expect(screen.getByRole("link", { name: /Garden Salad/ })).toBeTruthy();
+  expect(fetch.mock.calls.length).toBe(calls);
+  fireEvent.change(screen.getByLabelText("Search recipes by title"), {
+    target: { value: "missing" },
+  });
+  expect(screen.getByText("No recipes match your filters")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+  expect(screen.getByRole("link", { name: /Tomato Rice/ })).toBeTruthy();
+});
+
+test("dropdown cuisine filter and sidebar sorting share state without resetting search or sort", async () => {
+  const fetch = api([rice], ["Indian", "Italian"]);
+  open();
+  await screen.findByRole("link", { name: /Tomato Rice/ });
+  const sidebar = screen.getByRole("complementary", { name: "Quick filters" });
+  fireEvent.click(within(sidebar).getByRole("button", { name: "Longest first" }));
+  expect((screen.getByLabelText("Sort by") as HTMLSelectElement).value).toBe("desc");
+  fireEvent.change(screen.getByLabelText("Search recipes by title"), { target: { value: "rice" } });
+  fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+  fireEvent.change(screen.getByLabelText("Cuisine"), { target: { value: "Italian" } });
+  await waitFor(() =>
+    expect(fetch.mock.calls.some(([url]) => url === "/api/recipes?sort=desc&cuisine=Italian")).toBe(
+      true,
+    ),
+  );
+  expect(
+    within(sidebar).getByRole("button", { name: "Italian" }).getAttribute("aria-pressed"),
+  ).toBe("true");
+  expect((screen.getByLabelText("Sort by") as HTMLSelectElement).value).toBe("desc");
+  expect((screen.getByLabelText("Search recipes by title") as HTMLInputElement).value).toBe("rice");
+  expect(screen.getByRole("link", { name: /Tomato Rice/ })).toBeTruthy();
 });
 
 test("loading is distinct from an empty collection", async () => {
@@ -89,12 +139,16 @@ test("no matches offers a clear filter action without resetting sort", async () 
   api([], ["Indian"]);
   open();
   await screen.findByText("No recipes yet");
-  fireEvent.change(screen.getByLabelText("Cooking time"), { target: { value: "desc" } });
-  fireEvent.change(screen.getByLabelText("Cuisine"), { target: { value: "Indian" } });
-  expect(await screen.findByText("No recipes match this cuisine")).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "Show all cuisines" }));
+  fireEvent.change(screen.getByLabelText("Sort by"), { target: { value: "desc" } });
+  fireEvent.click(
+    within(screen.getByRole("complementary", { name: "Quick filters" })).getByRole("button", {
+      name: "Indian",
+    }),
+  );
+  expect(await screen.findByText("No recipes match your filters")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
   expect(await screen.findByText("No recipes yet")).toBeTruthy();
-  expect((screen.getByLabelText("Cooking time") as HTMLSelectElement).value).toBe("desc");
+  expect((screen.getByLabelText("Sort by") as HTMLSelectElement).value).toBe("desc");
 });
 
 test.each(["/api/recipes?sort=asc", "/api/cuisines"])(

@@ -4,6 +4,9 @@ import { Button } from "./components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { Label } from "./components/ui/label";
 import { NativeSelect, NativeSelectOption } from "./components/ui/native-select";
+import { Input } from "./components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "./components/ui/popover";
+import { ChevronDown, Search, SlidersHorizontal } from "lucide-react";
 
 type Summary = {
   id: string;
@@ -88,6 +91,7 @@ function NotFound() {
 function Collection() {
   const [sort, setSort] = React.useState("asc");
   const [cuisine, setCuisine] = React.useState("");
+  const [search, setSearch] = React.useState("");
   const [attempt, setAttempt] = React.useState(0);
   const [recipes, setRecipes] = React.useState<Summary[] | null>(null);
   const [cuisines, setCuisines] = React.useState<string[]>([]);
@@ -117,94 +121,192 @@ function Collection() {
     return () => controller.abort();
   }, [sort, cuisine, attempt]);
 
+  const visibleRecipes = recipes?.filter((recipe) =>
+    recipe.title.toLowerCase().includes(search.trim().toLowerCase()),
+  );
+  const hasFilters = Boolean(cuisine || search.trim());
+  const clearFilters = () => {
+    setCuisine("");
+    setSearch("");
+  };
+
   return (
-    <>
-      <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Your recipe book</h1>
-      <p className="mt-3 text-muted-foreground">Something good to cook.</p>
-      <div className="mt-8 flex flex-wrap gap-5 border-b pb-6">
-        <div className="grid w-full gap-2 sm:w-60">
-          <Label htmlFor="cuisine">Cuisine</Label>
-          <NativeSelect
-            id="cuisine"
-            className="w-full [&_select]:h-11"
-            value={cuisine}
-            onChange={(event) => setCuisine(event.target.value)}
+    <div className="grid gap-8 lg:grid-cols-[200px_minmax(0,1fr)]">
+      <aside aria-label="Quick filters" className="hidden space-y-8 border-r pr-6 lg:block">
+        <h2 className="text-lg font-semibold">Quick filters</h2>
+        <fieldset className="space-y-1">
+          <legend className="mb-3 text-sm font-medium text-muted-foreground">Cooking time</legend>
+          <Button
+            variant={sort === "asc" ? "secondary" : "ghost"}
+            className="min-h-11 w-full justify-start"
+            aria-pressed={sort === "asc"}
+            onClick={() => setSort("asc")}
           >
-            <NativeSelectOption value="">All cuisines</NativeSelectOption>
-            {cuisines.map((name) => (
-              <NativeSelectOption key={name} value={name}>
-                {name}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
-        </div>
-        <div className="grid w-full gap-2 sm:w-60">
-          <Label htmlFor="sort">Cooking time</Label>
-          <NativeSelect
-            id="sort"
-            className="w-full [&_select]:h-11"
-            value={sort}
-            onChange={(event) => setSort(event.target.value)}
+            Shortest first
+          </Button>
+          <Button
+            variant={sort === "desc" ? "secondary" : "ghost"}
+            className="min-h-11 w-full justify-start"
+            aria-pressed={sort === "desc"}
+            onClick={() => setSort("desc")}
           >
-            <NativeSelectOption value="asc">Shortest first</NativeSelectOption>
-            <NativeSelectOption value="desc">Longest first</NativeSelectOption>
-          </NativeSelect>
-        </div>
-      </div>
-      {failed ? (
-        <Failure retry={() => setAttempt(attempt + 1)} />
-      ) : !recipes ? (
-        <p className="py-12 text-muted-foreground" role="status">
-          Loading recipes…
-        </p>
-      ) : recipes.length === 0 ? (
-        <div className="space-y-4 py-12" role="status">
-          <h2 className="text-xl font-semibold">
-            {cuisine ? "No recipes match this cuisine" : "No recipes yet"}
-          </h2>
-          {cuisine ? (
-            <Button className="min-h-11" onClick={() => setCuisine("")}>
-              Show all cuisines
+            Longest first
+          </Button>
+        </fieldset>
+        <fieldset className="space-y-1">
+          <legend className="mb-3 text-sm font-medium text-muted-foreground">Cuisine</legend>
+          <Button
+            variant={cuisine === "" ? "secondary" : "ghost"}
+            className="min-h-11 w-full justify-start"
+            aria-pressed={cuisine === ""}
+            onClick={() => setCuisine("")}
+          >
+            All cuisines
+          </Button>
+          {cuisines.map((name) => (
+            <Button
+              key={name}
+              variant={cuisine === name ? "secondary" : "ghost"}
+              className="min-h-11 w-full justify-start whitespace-normal text-left"
+              aria-pressed={cuisine === name}
+              onClick={() => setCuisine(name)}
+            >
+              {name}
             </Button>
-          ) : (
-            <p className="text-muted-foreground">
-              Your collection will appear here when recipes are added.
-            </p>
-          )}
-        </div>
-      ) : (
-        <>
-          <p className="my-5 text-sm text-muted-foreground" role="status">
-            {recipes.length} {recipes.length === 1 ? "recipe" : "recipes"}
-          </p>
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {recipes.map((recipe) => (
-              <Card className="gap-0 pt-0" key={recipe.id}>
-                <article className="min-w-0">
-                  <a
-                    className="group block rounded-t-xl"
-                    href={`/recipes/${encodeURIComponent(recipe.id)}`}
-                  >
-                    <RecipeImage src={recipe.imageUrl} title={recipe.title} />
-                    <CardHeader className="py-4">
-                      <CardTitle>
-                        <h2 className="text-lg font-semibold group-hover:underline group-hover:underline-offset-4">
-                          {recipe.title}
-                        </h2>
-                      </CardTitle>
-                    </CardHeader>
-                  </a>
-                  <CardContent className="space-y-1 text-muted-foreground">
-                    <p>{recipe.cuisine}</p>
-                    <p className="text-sm">{recipe.cookMinutes} min cooking</p>
-                  </CardContent>
-                </article>
-              </Card>
-            ))}
+          ))}
+        </fieldset>
+      </aside>
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="relative basis-full sm:min-w-48 sm:flex-1 sm:basis-auto">
+            <Label htmlFor="search" className="sr-only">
+              Search recipes by title
+            </Label>
+            <Search
+              className="pointer-events-none absolute top-3.5 left-3 size-4 text-muted-foreground"
+              aria-hidden="true"
+            />
+            <Input
+              id="search"
+              type="search"
+              placeholder="Search recipes…"
+              className="h-11 pl-9"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
           </div>
-        </>
-      )}
-    </>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="h-11">
+                <SlidersHorizontal aria-hidden="true" />
+                Filters
+                <ChevronDown aria-hidden="true" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent
+              align="end"
+              className="w-72 max-w-[calc(100vw-2rem)] space-y-5 p-5"
+              aria-label="Recipe filters"
+            >
+              <div className="grid gap-2">
+                <Label htmlFor="cuisine">Cuisine</Label>
+                <NativeSelect
+                  id="cuisine"
+                  className="w-full [&_select]:h-11"
+                  value={cuisine}
+                  onChange={(event) => setCuisine(event.target.value)}
+                >
+                  <NativeSelectOption value="">All cuisines</NativeSelectOption>
+                  {cuisines.map((name) => (
+                    <NativeSelectOption key={name} value={name}>
+                      {name}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
+              </div>
+            </PopoverContent>
+          </Popover>
+          <div className="grid min-w-0 flex-1 gap-2 sm:max-w-48">
+            <Label htmlFor="sort" className="sr-only">
+              Sort by
+            </Label>
+            <NativeSelect
+              id="sort"
+              className="w-full [&_select]:h-11"
+              value={sort}
+              onChange={(event) => setSort(event.target.value)}
+            >
+              <NativeSelectOption value="asc">Sort by: shortest first</NativeSelectOption>
+              <NativeSelectOption value="desc">Sort by: longest first</NativeSelectOption>
+            </NativeSelect>
+          </div>
+        </div>
+        <div className="mt-8 border-b pb-5">
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Your recipe book</h1>
+          <p className="mt-2 text-sm text-muted-foreground">Find something good to cook.</p>
+        </div>
+        {failed ? (
+          <Failure retry={() => setAttempt(attempt + 1)} />
+        ) : !visibleRecipes ? (
+          <p className="py-12 text-muted-foreground" role="status">
+            Loading recipes…
+          </p>
+        ) : visibleRecipes.length === 0 ? (
+          <div className="space-y-4 py-12" role="status">
+            <h2 className="text-xl font-semibold">
+              {hasFilters ? "No recipes match your filters" : "No recipes yet"}
+            </h2>
+            {hasFilters ? (
+              <Button className="min-h-11" onClick={clearFilters}>
+                Clear filters
+              </Button>
+            ) : (
+              <p className="text-muted-foreground">
+                Your collection will appear here when recipes are added.
+              </p>
+            )}
+          </div>
+        ) : (
+          <>
+            <div className="my-5 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-muted-foreground" role="status">
+                {visibleRecipes.length} {visibleRecipes.length === 1 ? "recipe" : "recipes"}
+              </p>
+              {hasFilters && (
+                <Button variant="ghost" className="min-h-11" onClick={clearFilters}>
+                  Clear filters
+                </Button>
+              )}
+            </div>
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+              {visibleRecipes.map((recipe) => (
+                <Card className="gap-0 pt-0" key={recipe.id}>
+                  <article className="min-w-0">
+                    <a
+                      className="group block rounded-t-xl"
+                      href={`/recipes/${encodeURIComponent(recipe.id)}`}
+                    >
+                      <RecipeImage src={recipe.imageUrl} title={recipe.title} />
+                      <CardHeader className="py-4">
+                        <CardTitle>
+                          <h2 className="text-lg font-semibold group-hover:underline group-hover:underline-offset-4">
+                            {recipe.title}
+                          </h2>
+                        </CardTitle>
+                      </CardHeader>
+                    </a>
+                    <CardContent className="space-y-1 text-muted-foreground">
+                      <p>{recipe.cuisine}</p>
+                      <p className="text-sm">{recipe.cookMinutes} min cooking</p>
+                    </CardContent>
+                  </article>
+                </Card>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
   );
 }
 
