@@ -20,7 +20,7 @@ podman compose up -d
 podman compose ps
 ```
 
-Compose creates the dedicated `database` subdirectory on first start. Do not
+Compose creates the dedicated `postgres` subdirectory on first start. Do not
 start against an existing unknown directory, symlink, system database, or data
 from another PostgreSQL version. Do not copy, delete, chown, or relabel existing
 database files to make startup succeed; stop and investigate instead.
@@ -33,8 +33,8 @@ owns the schema; deployment privilege decisions belong to the operations slice.
 
 ### Host source versus container destination
 
-- **Host source:** `${HOME}/.local/state/ryouri/database`, e.g.
-  `/home/akanksh/.local/state/ryouri/database`. This is the only host database
+- **Host source:** `${HOME}/.local/state/ryouri/postgres`, e.g.
+  `/home/akanksh/.local/state/ryouri/postgres`. This is the only host database
   storage location configured here; it is a bind mount, not a named volume.
 - **Container destination:** `/var/lib/postgresql/data`, also explicitly set as
   `PGDATA`. This is PostgreSQL **17**'s internal data directory. It is **not**
@@ -150,10 +150,20 @@ check; no pre-existing database was opened or altered.
   changed in this correction; earlier workspace check limitations remain.
 
 The validation container was stopped/removed with Compose down, **without**
-removing data. The new dedicated database directory is retained. An ignored,
+removing data. The earlier `database` directory is retained untouched. An ignored,
 mode-0600 `apps/database/.env` holds generated local credentials and validation
-port 55432; keep it to reconnect to this new database. No cleanup, migration or
-modification of existing system databases or old named volumes was performed.
+port 55432. No cleanup, migration or modification of existing system databases
+or old named volumes was performed.
+
+The final host-directory clarification changes the configured source to
+`${HOME}/.local/state/ryouri/postgres`, keeping the same container destination
+and `PGDATA`. The earlier runtime evidence above used `database`, not `postgres`.
+The final configuration was checked for the exact new source/destination and
+SELinux option without starting a server or changing either directory. Existing
+files are **not** automatically moved from `database` to `postgres`; first start
+with an absent `postgres` directory initializes a separate new database. If you
+need existing content transferred, stop and plan an explicit backed-up migration
+rather than assuming changing the mount path moves the files.
 
 No image files or running API were part of these checks. Database-only proof
 is not AC-13/AC-14 full-application acceptance or release acceptance.
