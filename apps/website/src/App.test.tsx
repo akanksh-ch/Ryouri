@@ -136,6 +136,22 @@ test("direct detail URL preserves content order, plain/grouped ingredients, and 
   expect(screen.getByText("Rinse rice.").closest("ol")).toBeTruthy();
 });
 
+test.each([
+  { prepMinutes: 10, cookMinutes: 0 },
+  { prepMinutes: 0, cookMinutes: 10 },
+])("detail displays a valid recipe with times $prepMinutes/$cookMinutes", async (times) => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ ...detail, ...times }));
+  open("/recipes/tomato-rice");
+  await screen.findByRole("heading", { name: "Tomato Rice" });
+  expect(
+    within(screen.getByText("Preparation").parentElement!).getByText(`${times.prepMinutes} min`),
+  ).toBeTruthy();
+  expect(
+    within(screen.getByText("Cooking").parentElement!).getByText(`${times.cookMinutes} min`),
+  ).toBeTruthy();
+  expect(screen.queryByRole("alert")).toBeNull();
+});
+
 test("unknown detail URL is not found, not a request failure", async () => {
   api();
   open("/recipes/unknown");

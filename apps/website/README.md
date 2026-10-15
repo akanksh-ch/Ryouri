@@ -7,6 +7,12 @@ bundled Geist. The generated UI components live in `src/components/ui/`;
 This milestone is read-only: collection, cuisine filter, cooking-time sort, and
 recipe detail. Import and replacement confirmation are a later slice.
 
+Updated time rule: preparation and cooking times are individually nonnegative;
+only the combination of both being zero is invalid. Zero cooking time (for
+example, a salad) or zero preparation time remains valid and is displayed with
+explicit units. This read-only slice has no time-entry form; future import UI
+validation must use this rule, with independent server enforcement.
+
 ## Run and check
 
 From the repository root:
@@ -39,11 +45,12 @@ title, and ID ordering. Changing either control retains the other selection.
 ## Reader verification
 
 Automated tests replace only the external fetch boundary and render the real
-components. Eleven tests cover summary links, combined sort/filter requests,
+components. Thirteen tests cover summary links, combined sort/filter requests,
 loading, empty collection, no matches and clearing the filter, errors from either
 collection endpoint, retry, direct detail URLs, authored ingredient/step order,
 unknown IDs, detail failure/retry, broken-image fallback, lazy card images, and
-plain-text rendering. They do not prove the backend's ordering or persistence.
+plain-text rendering, and valid recipes with either preparation or cooking time
+zero. They do not prove the backend's ordering, time validation, or persistence.
 
 Browser checks performed for this slice:
 
