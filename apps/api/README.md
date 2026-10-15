@@ -4,10 +4,12 @@
 provides reads only; it does not create the database schema, import recipes,
 write data, or serve image files.
 
-The user's updated requirement supersedes SRS v1.1: both `prepMinutes` and
-`cookMinutes` must be integers strictly greater than zero. Zero is invalid.
-The database schema must enforce this rule. The later import slice must also
-reject zero/negative values with field-keyed validation errors; there is no
+The user's corrected requirement supersedes SRS v1.1 and the earlier
+strict-positive request: `prepMinutes >= 0` and `cookMinutes >= 0`, with
+`prepMinutes > 0 || cookMinutes > 0`. Either time may be zero; only both zero
+is invalid. Use OR, not addition, to avoid signed-integer overflow. The database
+schema must enforce this rule. The later import slice must also reject negative
+times or both-zero times with field-keyed validation errors; there is no
 write/import validation endpoint in this reader-only milestone.
 
 ## Run
@@ -73,7 +75,8 @@ Coverage includes default/ascending/descending cooking-time ordering with title/
 ties, simultaneous normalized cuisine filtering, SQL-like input as literal data,
 global cuisine deduplication, ordered grouped/plain detail ingredients, nullable
 images, missing IDs, rejected sort values, an empty collection, sanitized database
-errors, removal of the weather endpoint, database rejection of zero/negative
-preparation and cooking times, and acceptance of the one-minute boundary.
+errors, removal of the weather endpoint, database rejection of negative times
+or both times zero, acceptance of either time zero when the other is positive,
+and signed-32-bit maximum boundaries without sum overflow.
 Import, replacement, image/security,
 and deployment acceptance remain later milestones.

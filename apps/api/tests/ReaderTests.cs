@@ -104,11 +104,12 @@ public sealed class ReaderTests : IClassFixture<ReaderDatabase>
     }
 
     [Theory]
-    [InlineData(0, 1)]
-    [InlineData(1, 0)]
+    [InlineData(0, 0)]
     [InlineData(-1, 1)]
     [InlineData(1, -1)]
-    public async Task Persistence_rejects_nonpositive_preparation_or_cooking_time(int prepMinutes, int cookMinutes)
+    [InlineData(-1, int.MaxValue)]
+    [InlineData(int.MaxValue, -1)]
+    public async Task Persistence_rejects_negative_times_or_both_times_zero(int prepMinutes, int cookMinutes)
     {
         await using var connection = new NpgsqlConnection(database.ConnectionString);
         await connection.OpenAsync();
@@ -123,16 +124,26 @@ public sealed class ReaderTests : IClassFixture<ReaderDatabase>
         Assert.Equal(PostgresErrorCodes.CheckViolation, error.SqlState);
     }
 
-    [Fact]
-    public async Task Persistence_accepts_one_minute_preparation_and_cooking_time()
+    [Theory]
+    [InlineData(1, 1)]
+    [InlineData(0, 1)]
+    [InlineData(1, 0)]
+    [InlineData(0, int.MaxValue)]
+    [InlineData(int.MaxValue, 0)]
+    [InlineData(1, int.MaxValue)]
+    [InlineData(int.MaxValue, 1)]
+    [InlineData(int.MaxValue, int.MaxValue)]
+    public async Task Persistence_accepts_nonnegative_times_when_either_is_positive_without_sum_overflow(int prepMinutes, int cookMinutes)
     {
         await using var connection = new NpgsqlConnection(database.ConnectionString);
         await connection.OpenAsync();
         await using var transaction = await connection.BeginTransactionAsync();
         await using var command = new NpgsqlCommand("""
             INSERT INTO recipes (id, title, cuisine, prep_minutes, cook_minutes, servings, ingredients, steps)
-            VALUES ('positive-times', 'Positive times', 'Indian', 1, 1, 1, '[{"items":["Rice"]}]', ARRAY['Cook'])
+            VALUES ('valid-times', 'Valid times', 'Indian', $1, $2, 1, '[{"items":["Rice"]}]', ARRAY['Cook'])
             """, connection, transaction);
+        command.Parameters.AddWithValue(prepMinutes);
+        command.Parameters.AddWithValue(cookMinutes);
         Assert.Equal(1, await command.ExecuteNonQueryAsync());
     }
 
