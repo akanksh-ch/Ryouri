@@ -64,17 +64,29 @@ Do not edit an already applied migration; add the next numbered SQL file.
 
 Initialization scripts do not run again on existing data directories. Record the applied
 filenames with your deployment and explicitly apply each new migration once,
-after backing up, for example:
+after backing up, as shown below.
+
+Migration `002_require_positive_times.sql` supersedes SRS v1.1's zero-time
+allowance per the updated user requirement: **both preparation and cooking
+minutes must be strictly greater than zero**. Empty-directory initialization
+applies 001 then 002. For an existing deployment with only 001, pause imports,
+back up, and inspect zero-time rows before explicitly applying 002:
 
 ```sh
 podman compose exec -T postgres psql -U ryouri -d ryouri -v ON_ERROR_STOP=1 \
-  < migrations/002_example.sql
+  -c 'SELECT id, prep_minutes, cook_minutes FROM recipes WHERE prep_minutes = 0 OR cook_minutes = 0;'
+podman compose exec -T postgres psql -U ryouri -d ryouri -v ON_ERROR_STOP=1 \
+  < migrations/002_require_positive_times.sql
 ```
 
-That is a future-migration command template, not an existing file. No migration
-framework or additional metadata table is needed for this first schema.
+If zero-time recipes exist, 002 fails atomically without rewriting any values
+or leaving partially changed constraints. Obtain explicit corrections from the
+maintainer before retrying; never silently replace zeros with invented times.
+The API import contract must enforce the same new requirement. No existing host
+database was migrated as part of this change. No migration framework or extra
+metadata table is needed.
 
-The database enforces required columns, unique identity, nonnegative times,
+The database enforces required columns, unique identity, strictly positive times,
 positive servings, nonempty JSON ingredient arrays, and nonempty step arrays.
 The API must additionally validate the full SRS import contract: slug/lengths,
 trimmed cuisine, groups/items/headings, entry limits, and nonblank steps. JSONB
@@ -92,11 +104,11 @@ podman compose exec -T postgres psql -U ryouri -d ryouri < check.sql
 ```
 
 The check exits nonzero on failure. It tests unique identity, each required
-column, negative times, nonpositive servings, empty/non-array ingredients, empty
+column, zero/negative times, nonpositive servings, empty/non-array ingredients, empty
 steps, nullable optional fields, and ingredient/step order. Its fixture rolls
 back; if its reserved ID already exists, it fails without changing that recipe.
 For an independently managed test PostgreSQL, use
-`psql "$DATABASE_URL" -f check.sql` after applying migration 001.
+`psql "$DATABASE_URL" -f check.sql` after applying migrations 001 and 002.
 
 ## Database backup and restore
 
@@ -164,6 +176,16 @@ files are **not** automatically moved from `database` to `postgres`; first start
 with an absent `postgres` directory initializes a separate new database. If you
 need existing content transferred, stop and plan an explicit backed-up migration
 rather than assuming changing the mount path moves the files.
+
+### Strictly positive times validation
+
+Validated 001 then 002 in an isolated PostgreSQL 17 container with tmpfs data,
+no host database mounts and no published ports. The updated check failed before
+002 because zero preparation time was accepted, then passed after 002, including
+separate zero and negative cases for both time fields. A zero-time probe also
+proved 002 refuses existing invalid rows atomically: its stored values and the
+original constraints remained unchanged after failure. The ephemeral validation
+container was stopped; no existing host database was opened or migrated.
 
 No image files or running API were part of these checks. Database-only proof
 is not AC-13/AC-14 full-application acceptance or release acceptance.

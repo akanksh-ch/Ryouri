@@ -5,7 +5,7 @@ BEGIN;
 INSERT INTO recipes (
     id, title, cuisine, prep_minutes, cook_minutes, servings, ingredients, steps
 ) VALUES (
-    'database-constraint-check', 'Constraint check', 'Test', 0, 0, 1,
+    'database-constraint-check', 'Constraint check', 'Test', 1, 1, 1,
     '[{"items":["first","second"]},{"heading":"Dough","items":["third"]}]',
     ARRAY['First step', 'Second step']
 );
@@ -33,7 +33,9 @@ BEGIN
 
     FOREACH change IN ARRAY ARRAY[
         'prep_minutes = -1',
+        'prep_minutes = 0',
         'cook_minutes = -1',
+        'cook_minutes = 0',
         'servings = 0',
         'servings = -1',
         'ingredients = ''[]''::jsonb',
