@@ -1,4 +1,5 @@
 import * as React from "react";
+import { motion } from "motion/react";
 import { Alert, AlertDescription, AlertTitle } from "./components/ui/alert";
 import { Button } from "./components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
@@ -20,6 +21,17 @@ import {
   Timer,
   Users,
 } from "lucide-react";
+
+const MotionCard = motion.create(Card);
+const motionPreference = "(prefers-reduced-motion: reduce)";
+function subscribeMotionPreference(notify: () => void) {
+  const media = window.matchMedia?.(motionPreference);
+  media?.addEventListener("change", notify);
+  return () => media?.removeEventListener("change", notify);
+}
+function prefersReducedMotion() {
+  return window.matchMedia?.(motionPreference).matches ?? true;
+}
 
 type Summary = {
   id: string;
@@ -110,6 +122,8 @@ function NotFound() {
 }
 
 function Collection() {
+  // Motion 14's useReducedMotion snapshots the preference; subscribe for live OS changes.
+  const reduceMotion = React.useSyncExternalStore(subscribeMotionPreference, prefersReducedMotion);
   const [sort, setSort] = React.useState("asc");
   const [cuisine, setCuisine] = React.useState("");
   const [search, setSearch] = React.useState("");
@@ -153,7 +167,10 @@ function Collection() {
 
   return (
     <div className="grid gap-8 lg:grid-cols-[200px_minmax(0,1fr)]">
-      <aside aria-label="Quick filters" className="hidden space-y-8 border-r pr-6 lg:block">
+      <aside
+        aria-label="Quick filters"
+        className="hidden space-y-8 border-r pr-6 lg:block [&_button]:motion-safe:transition-transform [&_button]:motion-safe:duration-150 [&_button[aria-pressed=true]]:motion-safe:translate-x-0.5"
+      >
         <h2 className="text-lg font-semibold">Quick filters</h2>
         <fieldset className="space-y-1">
           <legend className="mb-3 text-sm font-medium text-muted-foreground">
@@ -316,7 +333,14 @@ function Collection() {
             </div>
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
               {visibleRecipes.map((recipe) => (
-                <Card className="gap-0 pt-0" key={recipe.id}>
+                <MotionCard
+                  className="gap-0 pt-0"
+                  key={recipe.id}
+                  layout={reduceMotion ? false : "position"}
+                  initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: reduceMotion ? 0 : 0.18, ease: [0.23, 1, 0.32, 1] }}
+                >
                   <article className="min-w-0">
                     <a
                       className="group block rounded-t-xl"
@@ -339,7 +363,7 @@ function Collection() {
                       </p>
                     </CardContent>
                   </article>
-                </Card>
+                </MotionCard>
               ))}
             </div>
           </>
