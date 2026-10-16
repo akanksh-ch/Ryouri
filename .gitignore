@@ -1,3 +1,6 @@
+# Playwright artifacts (at any workspace depth)
+.playwright-results/
+
 # Logs
 logs
 *.log
