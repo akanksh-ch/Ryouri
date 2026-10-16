@@ -9,7 +9,9 @@ const recipes = [
 ];
 try {
   for (const reducedMotion of ["no-preference", "reduce"]) {
+    const colorScheme = process.env.COLOR_SCHEME || "light";
     const page = await browser.newPage({
+      colorScheme,
       reducedMotion,
       viewport: { width: process.env.MOBILE ? 390 : 1280, height: 900 },
     });
@@ -23,6 +25,11 @@ try {
     );
     await page.goto(process.env.BASE_URL || "http://127.0.0.1:5179");
     await page.getByRole("link", { name: /Rice$/ }).waitFor();
+    assert.equal(
+      await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme),
+      colorScheme,
+      "system theme survives collection motion integration",
+    );
     await page.waitForFunction(() =>
       [...document.querySelectorAll('[data-slot="card"]')].every(
         (card) => getComputedStyle(card).opacity === "1",
@@ -111,7 +118,7 @@ try {
     );
     assert.deepEqual(errors, []);
     console.log(
-      `PASS ${reducedMotion}: entry, rapid filtering, visibility, focus, runtime preference change, no loops/errors`,
+      `PASS ${colorScheme}/${reducedMotion}: theme, entry, rapid filtering, visibility, focus, runtime preference change, no loops/errors`,
     );
     await page.close();
   }
