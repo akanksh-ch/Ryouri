@@ -4,7 +4,7 @@ A self-hosted personal recipe book built with React, ASP.NET Core, and PostgreSQ
 Browse recipes, filter by cuisine, sort by cooking time, and follow ordered
 instructions with plain or grouped ingredients.
 
-## Preview
+## Screenshots
 
 ### Recipe collection
 
@@ -27,10 +27,11 @@ flowchart LR
 
 ## Run locally
 
-Requirements: [Vite+](https://viteplus.dev/guide/), .NET 10 SDK, and rootless
-Podman with `podman-compose`. Run commands from the repository root unless a
-step changes directories. Keep the backend and frontend running in separate
-terminals.
+Requirements: [Vite+](https://viteplus.dev/guide/), .NET 10 SDK, and Docker
+with Docker Compose, or Podman with `podman-compose`. The examples below use
+Docker; replace `docker compose` with `podman-compose` if you use Podman.
+Run commands from the repository root unless a step changes directories. Keep
+the backend and frontend running in separate terminals.
 
 ### 1. Database
 
@@ -41,14 +42,34 @@ cd apps/database
 cp .env.example .env
 # Edit .env: set POSTGRES_PASSWORD and, optionally, POSTGRES_PORT=55432.
 mkdir -p "$HOME/.local/state/ryouri/postgres"
-podman-compose up -d
-podman-compose exec -T postgres pg_isready -U ryouri -d ryouri
+docker compose up -d
+docker compose exec -T postgres pg_isready -U ryouri -d ryouri
 ```
 
-The host directory `~/.local/state/ryouri/postgres` stores persistent data. It is
-mounted at `/var/lib/postgresql/data` **inside the container**; no host system
-PostgreSQL directory is used. The database port binds to localhost only and
-defaults to `5432`; choose a free port in `.env` if needed.
+By default, database files live in `~/.local/state/ryouri/postgres` on your host,
+mounted at `/var/lib/postgresql/data` inside the container. To choose another
+host directory, change the first volume entry in `compose.yaml`. Alternatively,
+use a container-managed named volume:
+
+Replace the first entry under `services.postgres.volumes` with:
+
+```yaml
+- postgres_data:/var/lib/postgresql/data
+```
+
+Then add this at the top level of `compose.yaml`:
+
+```yaml
+volumes:
+  postgres_data:
+```
+
+Both options keep data across container recreation. Do not remove the volume or
+host directory unless you intend to delete the database. Changing storage does
+not migrate existing data.
+
+The database port binds to localhost only and defaults to `5432`; choose a free
+port in `.env` if needed.
 
 A fresh database applies migrations automatically. For an existing Ryouri
 database, apply only migrations that have not already been applied, in filename
@@ -57,7 +78,7 @@ order. Do not reset or delete an existing data directory to apply a migration.
 Optionally load sample recipes after PostgreSQL is ready:
 
 ```sh
-podman-compose exec -T postgres psql -v ON_ERROR_STOP=1 -U ryouri -d ryouri < seed.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U ryouri -d ryouri < seed.sql
 cd ../..
 ```
 
@@ -93,5 +114,5 @@ Open the localhost URL printed by Vite, normally `http://localhost:5173`.
 The development server forwards `/api` and `/images` requests to the backend on
 port `5101`.
 
-Full-stack Docker Compose deployment will be documented separately. This local
-setup is intended for localhost or a trusted private network, not public exposure.
+This setup is intended for localhost or a trusted private network, not public
+exposure.
