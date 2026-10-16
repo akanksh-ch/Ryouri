@@ -6,7 +6,20 @@ import { Label } from "./components/ui/label";
 import { NativeSelect, NativeSelectOption } from "./components/ui/native-select";
 import { Input } from "./components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "./components/ui/popover";
-import { ChevronDown, Search, SlidersHorizontal } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowUpDown,
+  BookOpen,
+  ChevronDown,
+  Clock,
+  Globe,
+  RotateCcw,
+  Search,
+  SearchX,
+  SlidersHorizontal,
+  Timer,
+  Users,
+} from "lucide-react";
 
 type Summary = {
   id: string;
@@ -71,6 +84,7 @@ function Failure({ retry }: { retry: () => void }) {
       <AlertDescription>
         <p>Check your connection and that the recipe service is running, then try again.</p>
         <Button className="mt-3 min-h-11" onClick={retry}>
+          <RotateCcw aria-hidden="true" data-icon="inline-start" />
           Try again
         </Button>
       </AlertDescription>
@@ -86,7 +100,10 @@ function NotFound() {
         This recipe may not exist. Choose a recipe from the collection.
       </p>
       <Button asChild variant="outline" className="min-h-11">
-        <a href="/">Back to recipes</a>
+        <a href="/">
+          <ArrowLeft aria-hidden="true" data-icon="inline-start" />
+          Back to recipes
+        </a>
       </Button>
     </div>
   );
@@ -139,7 +156,10 @@ function Collection() {
       <aside aria-label="Quick filters" className="hidden space-y-8 border-r pr-6 lg:block">
         <h2 className="text-lg font-semibold">Quick filters</h2>
         <fieldset className="space-y-1">
-          <legend className="mb-3 text-sm font-medium text-muted-foreground">Cooking time</legend>
+          <legend className="mb-3 text-sm font-medium text-muted-foreground">
+            <Clock className="mr-2 inline-block size-4 align-text-bottom" aria-hidden="true" />
+            Cooking time
+          </legend>
           <Button
             variant={sort === "asc" ? "secondary" : "ghost"}
             className="min-h-11 w-full justify-start"
@@ -158,7 +178,10 @@ function Collection() {
           </Button>
         </fieldset>
         <fieldset className="space-y-1">
-          <legend className="mb-3 text-sm font-medium text-muted-foreground">Cuisine</legend>
+          <legend className="mb-3 text-sm font-medium text-muted-foreground">
+            <Globe className="mr-2 inline-block size-4 align-text-bottom" aria-hidden="true" />
+            Cuisine
+          </legend>
           <Button
             variant={cuisine === "" ? "secondary" : "ghost"}
             className="min-h-11 w-full justify-start"
@@ -202,9 +225,9 @@ function Collection() {
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" className="h-11">
-                <SlidersHorizontal aria-hidden="true" />
+                <SlidersHorizontal aria-hidden="true" data-icon="inline-start" />
                 Filters
-                <ChevronDown aria-hidden="true" />
+                <ChevronDown aria-hidden="true" data-icon="inline-end" />
               </Button>
             </PopoverTrigger>
             <PopoverContent
@@ -230,13 +253,17 @@ function Collection() {
               </div>
             </PopoverContent>
           </Popover>
-          <div className="grid min-w-0 flex-1 gap-2 sm:max-w-48">
+          <div className="relative grid min-w-0 flex-1 gap-2 sm:max-w-56">
+            <ArrowUpDown
+              className="pointer-events-none absolute top-3.5 left-3 z-10 size-4 text-muted-foreground"
+              aria-hidden="true"
+            />
             <Label htmlFor="sort" className="sr-only">
               Sort by
             </Label>
             <NativeSelect
               id="sort"
-              className="w-full [&_select]:h-11"
+              className="w-full [&_select]:h-11 [&_select]:pl-9"
               value={sort}
               onChange={(event) => setSort(event.target.value)}
             >
@@ -257,6 +284,11 @@ function Collection() {
           </p>
         ) : visibleRecipes.length === 0 ? (
           <div className="space-y-4 py-12" role="status">
+            {hasFilters ? (
+              <SearchX className="size-6 text-muted-foreground" aria-hidden="true" />
+            ) : (
+              <BookOpen className="size-6 text-muted-foreground" aria-hidden="true" />
+            )}
             <h2 className="text-xl font-semibold">
               {hasFilters ? "No recipes match your filters" : "No recipes yet"}
             </h2>
@@ -301,7 +333,10 @@ function Collection() {
                     </a>
                     <CardContent className="space-y-1 text-muted-foreground">
                       <p>{cuisineLabel(recipe.cuisine)}</p>
-                      <p className="text-sm">{recipe.cookMinutes} min cooking</p>
+                      <p className="flex items-center gap-2 text-sm">
+                        <Clock className="size-4 shrink-0" aria-hidden="true" />
+                        {recipe.cookMinutes} min cooking
+                      </p>
                     </CardContent>
                   </article>
                 </Card>
@@ -349,7 +384,10 @@ function Detail({ id }: { id: string }) {
   return (
     <article className="mx-auto max-w-4xl">
       <Button asChild variant="outline" className="mb-6 min-h-11">
-        <a href="/">Back to recipes</a>
+        <a href="/">
+          <ArrowLeft aria-hidden="true" data-icon="inline-start" />
+          Back to recipes
+        </a>
       </Button>
       <RecipeImage src={recipe.imageUrl} title={recipe.title} hero />
       <h1 className="text-3xl leading-tight font-semibold tracking-tight sm:text-4xl">
@@ -362,19 +400,31 @@ function Detail({ id }: { id: string }) {
       )}
       <dl className="my-8 grid grid-cols-2 gap-5 border-y py-6 sm:grid-cols-4">
         <div>
-          <dt className="text-sm text-muted-foreground">Preparation</dt>
+          <dt className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Timer className="size-4 shrink-0" aria-hidden="true" />
+            Preparation
+          </dt>
           <dd className="mt-1 font-medium">{recipe.prepMinutes} min</dd>
         </div>
         <div>
-          <dt className="text-sm text-muted-foreground">Cooking</dt>
+          <dt className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Clock className="size-4 shrink-0" aria-hidden="true" />
+            Cooking
+          </dt>
           <dd className="mt-1 font-medium">{recipe.cookMinutes} min</dd>
         </div>
         <div>
-          <dt className="text-sm text-muted-foreground">Servings</dt>
+          <dt className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Users className="size-4 shrink-0" aria-hidden="true" />
+            Servings
+          </dt>
           <dd className="mt-1 font-medium">{recipe.servings}</dd>
         </div>
         <div>
-          <dt className="text-sm text-muted-foreground">Cuisine</dt>
+          <dt className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Globe className="size-4 shrink-0" aria-hidden="true" />
+            Cuisine
+          </dt>
           <dd className="mt-1 font-medium">{cuisineLabel(recipe.cuisine)}</dd>
         </div>
       </dl>

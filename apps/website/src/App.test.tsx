@@ -268,3 +268,25 @@ test("recipe text is never interpreted as HTML", async () => {
   expect(await screen.findByText("<script>bad()</script>")).toBeTruthy();
   expect(document.querySelector("main script")).toBeNull();
 });
+
+test("detail metadata and navigation icons stay decorative with text labels intact", async () => {
+  api();
+  open("/recipes/tomato-rice");
+  await screen.findByRole("heading", { name: "Tomato Rice" });
+  const back = screen.getByRole("link", { name: "Back to recipes" });
+  expect(back.querySelector('svg[aria-hidden="true"]')).toBeTruthy();
+  for (const label of ["Preparation", "Cooking", "Servings", "Cuisine"]) {
+    expect(screen.getByText(label).querySelector('svg[aria-hidden="true"]')).toBeTruthy();
+  }
+  for (const icon of document.querySelectorAll("main svg")) {
+    expect(icon.getAttribute("aria-hidden")).toBe("true");
+  }
+});
+
+test("empty collection has a decorative accent without replacing its message", async () => {
+  api([]);
+  open();
+  await screen.findByRole("heading", { name: "No recipes yet" });
+  expect(screen.getByRole("status").querySelector('svg[aria-hidden="true"]')).toBeTruthy();
+  expect(screen.getByText("Your collection will appear here when recipes are added.")).toBeTruthy();
+});
