@@ -111,7 +111,8 @@ function NotFound() {
 
 function Collection() {
   const [sort, setSort] = React.useState("asc");
-  const [cuisine, setCuisine] = React.useState("");
+  const [cuisineSelection, setCuisineSelection] = React.useState<string[] | null>(null);
+  const [timeLimit, setTimeLimit] = React.useState<number | null>(null);
   const [search, setSearch] = React.useState("");
   const [attempt, setAttempt] = React.useState(0);
   const [recipes, setRecipes] = React.useState<Summary[] | null>(null);
@@ -122,10 +123,8 @@ function Collection() {
     const controller = new AbortController();
     setRecipes(null);
     setFailed(false);
-    const query = new URLSearchParams({ sort });
-    if (cuisine) query.set("cuisine", cuisine);
     Promise.all([
-      read<Summary[]>(`/api/recipes?${query}`, controller.signal),
+      read<Summary[]>("/api/recipes?sort=asc", controller.signal),
       read<string[]>("/api/cuisines", controller.signal),
     ])
       .then(([recipes, cuisines]) => {
@@ -140,16 +139,41 @@ function Collection() {
         if (!controller.signal.aborted) setFailed(true);
       });
     return () => controller.abort();
-  }, [sort, cuisine, attempt]);
+  }, [attempt]);
 
-  const visibleRecipes = recipes?.filter((recipe) =>
-    recipe.title.toLowerCase().includes(search.trim().toLowerCase()),
+  const selectedCuisines = cuisineSelection ?? cuisines;
+  const cuisine = cuisineSelection?.length === 1 ? cuisineSelection[0] : "";
+  const visibleRecipes = recipes
+    ?.filter(
+      (recipe) =>
+        (cuisineSelection === null || cuisineSelection.includes(recipe.cuisine)) &&
+        (timeLimit === null || recipe.cookMinutes < timeLimit) &&
+        recipe.title.toLowerCase().includes(search.trim().toLowerCase()),
+    )
+    .sort((a, b) =>
+      sort === "asc" ? a.cookMinutes - b.cookMinutes : b.cookMinutes - a.cookMinutes,
+    );
+  const hasFilters = Boolean(
+    (cuisineSelection !== null && cuisineSelection.length !== cuisines.length) ||
+    search.trim() ||
+    timeLimit !== null,
   );
-  const hasFilters = Boolean(cuisine || search.trim());
   const clearFilters = () => {
-    setCuisine("");
+    setCuisineSelection(null);
+    setTimeLimit(null);
     setSearch("");
   };
+  const timeButtons = [30, 10, 5].map((limit) => (
+    <Button
+      key={limit}
+      variant={timeLimit === limit ? "secondary" : "ghost"}
+      className="min-h-11 w-full justify-start"
+      aria-pressed={timeLimit === limit}
+      onClick={() => setTimeLimit(timeLimit === limit ? null : limit)}
+    >
+      Under {limit} min
+    </Button>
+  ));
 
   return (
     <div className="grid gap-8 lg:grid-cols-[200px_minmax(0,1fr)]">
@@ -160,43 +184,20 @@ function Collection() {
             <Clock className="mr-2 inline-block size-4 align-text-bottom" aria-hidden="true" />
             Cooking time
           </legend>
-          <Button
-            variant={sort === "asc" ? "secondary" : "ghost"}
-            className="min-h-11 w-full justify-start"
-            aria-pressed={sort === "asc"}
-            onClick={() => setSort("asc")}
-          >
-            Shortest first
-          </Button>
-          <Button
-            variant={sort === "desc" ? "secondary" : "ghost"}
-            className="min-h-11 w-full justify-start"
-            aria-pressed={sort === "desc"}
-            onClick={() => setSort("desc")}
-          >
-            Longest first
-          </Button>
+          {timeButtons}
         </fieldset>
         <fieldset className="space-y-1">
           <legend className="mb-3 text-sm font-medium text-muted-foreground">
             <Globe className="mr-2 inline-block size-4 align-text-bottom" aria-hidden="true" />
             Cuisine
           </legend>
-          <Button
-            variant={cuisine === "" ? "secondary" : "ghost"}
-            className="min-h-11 w-full justify-start"
-            aria-pressed={cuisine === ""}
-            onClick={() => setCuisine("")}
-          >
-            All cuisines
-          </Button>
           {cuisines.map((name) => (
             <Button
               key={name}
               variant={cuisine === name ? "secondary" : "ghost"}
               className="min-h-11 w-full justify-start whitespace-normal text-left"
               aria-pressed={cuisine === name}
-              onClick={() => setCuisine(name)}
+              onClick={() => setCuisineSelection(cuisine === name ? null : [name])}
             >
               {cuisineLabel(name)}
             </Button>
@@ -232,25 +233,34 @@ function Collection() {
             </PopoverTrigger>
             <PopoverContent
               align="end"
-              className="w-72 max-w-[calc(100vw-2rem)] space-y-5 p-5"
+              className="max-h-[70dvh] w-72 max-w-[calc(100vw-2rem)] space-y-5 overflow-y-auto p-5"
               aria-label="Recipe filters"
             >
-              <div className="grid gap-2">
-                <Label htmlFor="cuisine">Cuisine</Label>
-                <NativeSelect
-                  id="cuisine"
-                  className="w-full [&_select]:h-11"
-                  value={cuisine}
-                  onChange={(event) => setCuisine(event.target.value)}
-                >
-                  <NativeSelectOption value="">All cuisines</NativeSelectOption>
-                  {cuisines.map((name) => (
-                    <NativeSelectOption key={name} value={name}>
-                      {cuisineLabel(name)}
-                    </NativeSelectOption>
-                  ))}
-                </NativeSelect>
-              </div>
+              <fieldset className="space-y-1 lg:hidden">
+                <legend className="mb-3 text-sm font-medium text-muted-foreground">
+                  Cooking time
+                </legend>
+                {timeButtons}
+              </fieldset>
+              <fieldset className="grid gap-2">
+                <legend className="mb-3 text-sm font-medium text-muted-foreground">Cuisine</legend>
+                {cuisines.map((name) => (
+                  <label key={name} className="flex min-h-11 cursor-pointer items-center gap-3">
+                    <input
+                      type="checkbox"
+                      className="size-4"
+                      checked={selectedCuisines.includes(name)}
+                      onChange={(event) => {
+                        const next = event.target.checked
+                          ? [...selectedCuisines, name]
+                          : selectedCuisines.filter((value) => value !== name);
+                        setCuisineSelection(next.length === cuisines.length ? null : next);
+                      }}
+                    />
+                    {cuisineLabel(name)}
+                  </label>
+                ))}
+              </fieldset>
             </PopoverContent>
           </Popover>
           <div className="relative grid min-w-0 flex-1 gap-2 sm:max-w-56">
@@ -290,9 +300,9 @@ function Collection() {
               <BookOpen className="size-6 text-muted-foreground" aria-hidden="true" />
             )}
             <h2 className="text-xl font-semibold">
-              {hasFilters ? "No recipes match your filters" : "No recipes yet"}
+              {recipes?.length ? "No recipes match your filters" : "No recipes yet"}
             </h2>
-            {hasFilters ? (
+            {recipes?.length ? (
               <Button className="min-h-11" onClick={clearFilters}>
                 Clear filters
               </Button>

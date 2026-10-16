@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, expect, test, vi } from "vite-plus/test";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { App } from "./App";
 
 const rice = {
@@ -49,57 +49,14 @@ test("collection uses summaries and links image/title to stable recipe URLs", as
   expect(screen.getByText("No image")).toBeTruthy();
 });
 
-test("cuisine display uses title case while filter values retain stored casing", async () => {
-  const fetch = api([{ ...rice, cuisine: "japanese" }], ["japanese"]);
-  open();
-  await screen.findByRole("link", { name: /Tomato Rice/ });
-  expect(screen.getByText("Japanese", { selector: "p" })).toBeTruthy();
-  const sidebar = screen.getByRole("complementary", { name: "Quick filters" });
-  fireEvent.click(within(sidebar).getByRole("button", { name: "Japanese" }));
-  await waitFor(() =>
-    expect(fetch.mock.calls.some(([url]) => url === "/api/recipes?sort=asc&cuisine=japanese")).toBe(
-      true,
-    ),
-  );
-  fireEvent.click(screen.getByRole("button", { name: "Filters" }));
-  const option = screen.getByRole("option", { name: "Japanese" }) as HTMLOptionElement;
-  expect(option.value).toBe("japanese");
-  expect((screen.getByLabelText("Cuisine") as HTMLSelectElement).value).toBe("japanese");
-});
-
 test.each([
   ["japanese", "Japanese"],
   ["middle eastern", "Middle Eastern"],
 ])("detail displays stored cuisine %s as %s", async (stored, label) => {
   vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ ...detail, cuisine: stored }));
   open("/recipes/tomato-rice");
-  await screen.findByRole("heading", { name: "Tomato Rice" });
+  await screen.findByRole("heading", { name: /Tomato Rice/ });
   expect(within(screen.getByText("Cuisine").parentElement!).getByText(label)).toBeTruthy();
-});
-
-test("sort/filter compose in HTTP requests and neither selection resets the other", async () => {
-  const fetch = api();
-  open();
-  await screen.findByRole("link", { name: /Tomato Rice/ });
-  expect(fetch.mock.calls.some(([url]) => url === "/api/recipes?sort=asc")).toBe(true);
-  fireEvent.change(screen.getByLabelText("Sort by"), { target: { value: "desc" } });
-  fireEvent.click(
-    within(screen.getByRole("complementary", { name: "Quick filters" })).getByRole("button", {
-      name: "Indian",
-    }),
-  );
-  await waitFor(() =>
-    expect(fetch.mock.calls.some(([url]) => url === "/api/recipes?sort=desc&cuisine=Indian")).toBe(
-      true,
-    ),
-  );
-  expect((screen.getByLabelText("Sort by") as HTMLSelectElement).value).toBe("desc");
-  fireEvent.change(screen.getByLabelText("Sort by"), { target: { value: "asc" } });
-  await waitFor(() =>
-    expect(fetch.mock.calls.some(([url]) => url === "/api/recipes?sort=asc&cuisine=Indian")).toBe(
-      true,
-    ),
-  );
 });
 
 test("local title search ignores case and surrounding spaces without new requests", async () => {
@@ -125,27 +82,119 @@ test("local title search ignores case and surrounding spaces without new request
   expect(screen.getByRole("link", { name: /Tomato Rice/ })).toBeTruthy();
 });
 
-test("dropdown cuisine filter and sidebar sorting share state without resetting search or sort", async () => {
-  const fetch = api([rice], ["Indian", "Italian"]);
+const collection = [
+  { ...rice, id: "zero", title: "Zero Rice", cookMinutes: 0 },
+  { ...rice, id: "five", title: "Five Rice", cookMinutes: 5 },
+  { ...rice, id: "ten", title: "Ten Rice", cuisine: "italian", cookMinutes: 10 },
+  rice,
+  { ...rice, id: "thirty", title: "Thirty Rice", cuisine: "japanese", cookMinutes: 30 },
+];
+const titles = () =>
+  screen
+    .queryAllByRole("article")
+    .map((article) => within(article).getByRole("heading").textContent);
+const sidebar = () => within(screen.getByRole("complementary", { name: "Quick filters" }));
+
+test("optional exclusive time toggles use strict cooking-time boundaries and toggle off", async () => {
+  api(collection, ["Indian", "italian", "japanese"]);
   open();
   await screen.findByRole("link", { name: /Tomato Rice/ });
-  const sidebar = screen.getByRole("complementary", { name: "Quick filters" });
-  fireEvent.click(within(sidebar).getByRole("button", { name: "Longest first" }));
-  expect((screen.getByLabelText("Sort by") as HTMLSelectElement).value).toBe("desc");
-  fireEvent.change(screen.getByLabelText("Search recipes by title"), { target: { value: "rice" } });
-  fireEvent.click(screen.getByRole("button", { name: "Filters" }));
-  fireEvent.change(screen.getByLabelText("Cuisine"), { target: { value: "Italian" } });
-  await waitFor(() =>
-    expect(fetch.mock.calls.some(([url]) => url === "/api/recipes?sort=desc&cuisine=Italian")).toBe(
-      true,
-    ),
+  expect(titles()).toHaveLength(5);
+  for (const button of sidebar().getAllByRole("button"))
+    expect(button.getAttribute("aria-pressed")).toBe("false");
+  fireEvent.click(sidebar().getByRole("button", { name: "Under 30 min" }));
+  expect(titles()).toEqual(["Zero Rice", "Five Rice", "Ten Rice", "Tomato Rice"]);
+  fireEvent.click(sidebar().getByRole("button", { name: "Under 10 min" }));
+  expect(titles()).toEqual(["Zero Rice", "Five Rice"]);
+  expect(sidebar().getByRole("button", { name: "Under 30 min" }).getAttribute("aria-pressed")).toBe(
+    "false",
   );
-  expect(
-    within(sidebar).getByRole("button", { name: "Italian" }).getAttribute("aria-pressed"),
-  ).toBe("true");
+  fireEvent.click(sidebar().getByRole("button", { name: "Under 5 min" }));
+  expect(titles()).toEqual(["Zero Rice"]);
+  fireEvent.click(sidebar().getByRole("button", { name: "Under 5 min" }));
+  expect(titles()).toHaveLength(5);
+});
+
+test("API cuisine checkboxes default to all and synchronize single/multiple/empty selections", async () => {
+  api(collection, ["Indian", "italian", "japanese"]);
+  open();
+  await screen.findByRole("link", { name: /Tomato Rice/ });
+  fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+  expect(screen.queryByRole("button", { name: "All cuisines" })).toBeNull();
+  for (const checkbox of screen.getAllByRole("checkbox"))
+    expect((checkbox as HTMLInputElement).checked).toBe(true);
+  fireEvent.click(screen.getByRole("checkbox", { name: "Japanese" }));
+  expect(titles()).toEqual(["Zero Rice", "Five Rice", "Ten Rice", "Tomato Rice"]);
+  expect(sidebar().queryAllByRole("button", { pressed: true })).toHaveLength(0);
+  fireEvent.click(screen.getByRole("checkbox", { name: "Indian" }));
+  expect(titles()).toEqual(["Ten Rice"]);
+  expect(sidebar().getByRole("button", { name: "Italian" }).getAttribute("aria-pressed")).toBe(
+    "true",
+  );
+  fireEvent.click(screen.getByRole("checkbox", { name: "Italian" }));
+  expect(screen.getByText("No recipes match your filters")).toBeTruthy();
+  fireEvent.click(sidebar().getByRole("button", { name: "Japanese" }));
+  expect((screen.getByRole("checkbox", { name: "Japanese" }) as HTMLInputElement).checked).toBe(
+    true,
+  );
+  expect((screen.getByRole("checkbox", { name: "Indian" }) as HTMLInputElement).checked).toBe(
+    false,
+  );
+  fireEvent.click(sidebar().getByRole("button", { name: "Japanese" }));
+  for (const checkbox of screen.getAllByRole("checkbox"))
+    expect((checkbox as HTMLInputElement).checked).toBe(true);
+  expect(titles()).toHaveLength(5);
+});
+
+test("search, cuisine, time and sort compose locally; clear preserves sort and restores all controls", async () => {
+  const fetch = api(collection, ["Indian", "italian", "japanese"]);
+  open();
+  await screen.findByRole("link", { name: /Tomato Rice/ });
+  const calls = fetch.mock.calls.length;
+  fireEvent.change(screen.getByLabelText("Sort by"), { target: { value: "desc" } });
+  fireEvent.change(screen.getByLabelText("Search recipes by title"), {
+    target: { value: " RICE " },
+  });
+  fireEvent.click(sidebar().getByRole("button", { name: "Indian" }));
+  fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+  const popover = within(screen.getByRole("dialog", { name: "Recipe filters" }));
+  fireEvent.click(popover.getByRole("button", { name: "Under 10 min", hidden: true }));
+  expect(titles()).toEqual(["Five Rice", "Zero Rice"]);
+  expect(sidebar().getByRole("button", { name: "Under 10 min" }).getAttribute("aria-pressed")).toBe(
+    "true",
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+  expect(titles()).toEqual(["Thirty Rice", "Tomato Rice", "Ten Rice", "Five Rice", "Zero Rice"]);
   expect((screen.getByLabelText("Sort by") as HTMLSelectElement).value).toBe("desc");
-  expect((screen.getByLabelText("Search recipes by title") as HTMLInputElement).value).toBe("rice");
-  expect(screen.getByRole("link", { name: /Tomato Rice/ })).toBeTruthy();
+  expect((screen.getByLabelText("Search recipes by title") as HTMLInputElement).value).toBe("");
+  for (const checkbox of screen.getAllByRole("checkbox"))
+    expect((checkbox as HTMLInputElement).checked).toBe(true);
+  expect(sidebar().queryAllByRole("button", { pressed: true })).toHaveLength(0);
+  expect(fetch.mock.calls.length).toBe(calls);
+});
+
+test("a single API cuisine still has an optional sidebar toggle", async () => {
+  api();
+  open();
+  await screen.findByRole("link", { name: /Tomato Rice/ });
+  const button = sidebar().getByRole("button", { name: "Indian" });
+  expect(button.getAttribute("aria-pressed")).toBe("false");
+  fireEvent.click(button);
+  expect(button.getAttribute("aria-pressed")).toBe("true");
+  fireEvent.click(button);
+  expect(button.getAttribute("aria-pressed")).toBe("false");
+});
+
+test("an empty collection stays distinct even when filters are set", async () => {
+  api([], ["Indian"]);
+  open();
+  await screen.findByText("No recipes yet");
+  fireEvent.change(screen.getByLabelText("Search recipes by title"), {
+    target: { value: "missing" },
+  });
+  fireEvent.click(sidebar().getByRole("button", { name: "Under 5 min" }));
+  expect(screen.getByText("No recipes yet")).toBeTruthy();
+  expect(screen.queryByText("No recipes match your filters")).toBeNull();
 });
 
 test("loading is distinct from an empty collection", async () => {
@@ -161,22 +210,6 @@ test("loading is distinct from an empty collection", async () => {
   expect(screen.getByRole("status").textContent).toContain("Loading");
   resolve(Response.json([]));
   expect(await screen.findByText("No recipes yet")).toBeTruthy();
-});
-
-test("no matches offers a clear filter action without resetting sort", async () => {
-  api([], ["Indian"]);
-  open();
-  await screen.findByText("No recipes yet");
-  fireEvent.change(screen.getByLabelText("Sort by"), { target: { value: "desc" } });
-  fireEvent.click(
-    within(screen.getByRole("complementary", { name: "Quick filters" })).getByRole("button", {
-      name: "Indian",
-    }),
-  );
-  expect(await screen.findByText("No recipes match your filters")).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
-  expect(await screen.findByText("No recipes yet")).toBeTruthy();
-  expect((screen.getByLabelText("Sort by") as HTMLSelectElement).value).toBe("desc");
 });
 
 test.each(["/api/recipes?sort=asc", "/api/cuisines"])(
@@ -199,7 +232,7 @@ test.each(["/api/recipes?sort=asc", "/api/cuisines"])(
 test("direct detail URL preserves content order, plain/grouped ingredients, and ordered steps", async () => {
   api();
   open("/recipes/tomato-rice");
-  await screen.findByRole("heading", { name: "Tomato Rice" });
+  await screen.findByRole("heading", { name: /Tomato Rice/ });
   const main = screen.getByRole("main");
   expect(
     within(main)
@@ -224,7 +257,7 @@ test.each([
 ])("detail displays a valid recipe with times $prepMinutes/$cookMinutes", async (times) => {
   vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ ...detail, ...times }));
   open("/recipes/tomato-rice");
-  await screen.findByRole("heading", { name: "Tomato Rice" });
+  await screen.findByRole("heading", { name: /Tomato Rice/ });
   expect(
     within(screen.getByText("Preparation").parentElement!).getByText(`${times.prepMinutes} min`),
   ).toBeTruthy();
