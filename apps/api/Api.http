@@ -1,6 +1,20 @@
 @Api_HostAddress = http://localhost:5101
 
-GET {{Api_HostAddress}}/weatherforecast/
+GET {{Api_HostAddress}}/api/recipes
 Accept: application/json
 
-###
+### Combined cooking-time sorting and cuisine filtering
+GET {{Api_HostAddress}}/api/recipes?sort=desc&cuisine=Indian
+Accept: application/json
+
+### Cuisine options from the whole collection
+GET {{Api_HostAddress}}/api/cuisines
+Accept: application/json
+
+### Recipe detail (404 Problem Details when absent)
+GET {{Api_HostAddress}}/api/recipes/tomato-rice
+Accept: application/json
+
+### Invalid sort (400 with errors.sort)
+GET {{Api_HostAddress}}/api/recipes?sort=invalid
+Accept: application/json
